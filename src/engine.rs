@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use futures::channel::oneshot::channel;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{CanvasRenderingContext2d, HtmlImageElement, KeyboardEvent};
+use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 use crate::{browser};
 use anyhow::{anyhow, Result};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
@@ -136,6 +136,17 @@ impl Renderer {
             )
             .expect("Drawing is throwing exceptions! Unrecoverable error.");
     }
+
+    pub fn draw_entire_image(
+        &self,
+        image: &HtmlImageElement,
+        position: &Point
+    ) {
+        self.context
+            .draw_image_with_html_image_element(
+                image, position.x.into(), position.y.into())
+            .expect("Drawing is throwing exceptions! Unrecoverable error.")
+    }
 }
 
 enum KeyPress {
@@ -213,4 +224,19 @@ fn process_input(
 pub struct Point {
     pub x: i16,
     pub y: i16,
+}
+
+pub struct Image {
+    element: HtmlImageElement,
+    position: Point,
+}
+
+impl Image {
+    pub fn new(element: HtmlImageElement, position: Point) -> Self {
+        Self { element, position }
+    }
+
+    pub fn draw(&self, renderer: &Renderer) {
+        renderer.draw_entire_image(&self.element, &self.position)
+    }
 }
