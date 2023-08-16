@@ -1,3 +1,9 @@
+## start
+
+```shell
+NODE_OPTIONS=--openssl-legacy-provider npm rum start
+```
+
 ## How to install
 
 ```sh
