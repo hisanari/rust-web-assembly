@@ -25,6 +25,10 @@ impl WalkTheDog {
     }
 }
 
+const LOW_PLATFORM: i16 = 400;
+const HIGH_PLATFORM: i16 = 375;
+const FIRST_PLATFORM: i16 = 370;
+
 #[async_trait(?Send)]
 impl Game for WalkTheDog {
     async fn initialize(&self) -> Result<Box<dyn Game>> {
@@ -39,7 +43,7 @@ impl Game for WalkTheDog {
                 let platform = Platform::new(
                     platform_sheet.into_serde::<Sheet>()?,
                     engine::load_image("tiles.png").await?,
-                    Point{ x: 200, y: 400 },
+                    Point{ x: FIRST_PLATFORM, y: LOW_PLATFORM },
                 );
 
                 let rhb = RedHatBoy::new(
@@ -73,12 +77,15 @@ impl Game for WalkTheDog {
 
             walk.boy.update();
 
-            if walk
-                .boy
-                .bounding_box()
-                .intersects(&walk.platform.bounding_box())
-            {
-                walk.boy.land_on(walk.platform.bounding_box().y);
+            for bounding_box in &walk.platform.bounding_box() {
+                if walk.boy.bounding_box().intersects(bounding_box) {
+                    if walk.boy.velocity_y() > 0 &&
+                       walk.boy.pos_y() < walk.platform.position.y {
+                        walk.boy.land_on(bounding_box.y);
+                    } else {
+                        walk.boy.knock_out()
+                    }
+                }
             }
 
             if walk
@@ -90,6 +97,7 @@ impl Game for WalkTheDog {
             }
         }
     }
+
     fn draw(&self, renderer: &Renderer) {
         renderer.clear(&Rect {
             x: 0.0,
@@ -128,6 +136,8 @@ mod red_hat_boy_states {
     const GRAVITY: i16 = 1;
     const FALLING_FRAMES: u8 = 28;
     const FALLING_NAME: &str = "Dead";
+
+    const TERMINAL_VELOCITY: i16 = 20;
 
     #[derive(Copy, Clone)]
     pub struct RedHatBoyState<S> {
@@ -374,7 +384,9 @@ mod red_hat_boy_states {
 
     impl RedHatBoyContext {
         pub fn update(mut self, frame_count: u8) -> Self {
-            self.velocity.y += GRAVITY;
+            if self.velocity.y < TERMINAL_VELOCITY {
+                self.velocity.y += GRAVITY;
+            }
             if self.frame < frame_count {
                 self.frame += 1;
             } else {
@@ -405,6 +417,7 @@ mod red_hat_boy_states {
 
         fn stop(mut self) -> Self {
             self.velocity.x = 0;
+            self.velocity.y = 0;
             self
         }
 
@@ -536,6 +549,14 @@ impl RedHatBoy {
         }
     }
 
+    fn pos_y(&self) -> i16 {
+        self.state_machine.context().position.y
+    }
+
+    fn velocity_y(&self) -> i16 {
+        self.state_machine.context().velocity.y
+    }
+
     fn draw(&self, renderer: &Renderer) {
         let sprite = self.current_sprite().expect("Cell not found");
 
@@ -547,7 +568,7 @@ impl RedHatBoy {
                 w: sprite.frame.w.into(),
                 h: sprite.frame.h.into(),
             },
-            &self.bounding_box(),
+            &self.destination_box(),
         )
     }
 
@@ -572,6 +593,18 @@ impl RedHatBoy {
     }
 
     fn bounding_box(&self) -> Rect {
+        const X_OFFSET: f32 = 18.0;
+        const Y_OFFSET: f32 = 14.0;
+        const WIDTH_OFFSET: f32 = 28.0;
+        let mut bounding_box = self.destination_box();
+        bounding_box.x += X_OFFSET;
+        bounding_box.w -= WIDTH_OFFSET;
+        bounding_box.y += Y_OFFSET;
+        bounding_box.h -= Y_OFFSET;
+        bounding_box
+    }
+
+    fn destination_box(&self) -> Rect {
         let sprite = self.current_sprite().expect("Cell not found");
 
         Rect {
@@ -629,11 +662,10 @@ impl Platform {
                 w: (platform.frame.w * 3).into(),
                 h: platform.frame.h.into(),
             },
-            &self.bounding_box(),
+            &self.destination_box(),
         );
     }
-
-    fn bounding_box(&self) -> Rect {
+    fn destination_box(&self) -> Rect {
         let platform = self
             .sheet
             .frames
@@ -646,5 +678,33 @@ impl Platform {
             w: (platform.frame.w * 3).into(),
             h: platform.frame.h.into(),
         }
+    }
+
+    fn bounding_box(&self) -> Vec<Rect> {
+        const X_OFFSET: f32 = 60.0;
+        const END_OFFSET: f32 = 54.0;
+        let destination_box = self.destination_box();
+        let bounding_box_one = Rect {
+            x: destination_box.x,
+            y: destination_box.y,
+            w: X_OFFSET,
+            h: END_OFFSET,
+        };
+
+        let bounding_box_two = Rect {
+            x: destination_box.x + X_OFFSET,
+            y: destination_box.y,
+            w: destination_box.w - (X_OFFSET * 2.0),
+            h: destination_box.h,
+        };
+
+        let bounding_box_three = Rect {
+            x: destination_box.x + destination_box.w - X_OFFSET,
+            y: destination_box.y,
+            w: X_OFFSET,
+            h: END_OFFSET,
+        };
+
+        vec![bounding_box_one, bounding_box_two, bounding_box_three]
     }
 }
