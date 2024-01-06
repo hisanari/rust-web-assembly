@@ -125,25 +125,57 @@ pub struct Renderer {
     context: CanvasRenderingContext2d,
 }
 
+#[derive(Default)]
 pub struct Rect {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
+    pub position: Point,
+    pub w: i16,
+    pub h: i16,
 }
 
 impl Rect {
+    pub fn new(position: Point, w: i16, h: i16) -> Self {
+        Rect {
+            position,
+            w,
+            h,
+        }
+    }
+
+    pub fn new_from_x_y(x: i16, y: i16, w: i16, h: i16) -> Self {
+        Rect::new(Point { x, y }, w, h)
+    }
+
     pub fn intersects(&self, rect: &Rect) -> bool {
-        self.x < (rect.x + rect.w) && self.x + self.w > rect.x
-        && self.y < (rect.y + rect.w) && self.y + self.h > rect.y
+        self.x() < (rect.x() + rect.w) && self.x() + self.w > rect.x()
+            && self.y() < rect.bottom() && self.bottom() > rect.y()
+    }
+
+    pub fn right(&self) -> i16 {
+        self.x() + self.w
+    }
+
+    pub fn bottom(&self) -> i16 {
+        self.y() + self.h
+    }
+
+    pub fn x(&self) -> i16 {
+        self.position.x
+    }
+
+    pub fn y(&self) -> i16 {
+        self.position.y
+    }
+
+    pub fn set_x(&mut self, x: i16){
+        self.position.x = x
     }
 }
 
 impl Renderer {
     pub fn clear(&self, rect: &Rect) {
         self.context.clear_rect(
-            rect.x.into(),
-            rect.y.into(),
+            rect.x().into(),
+            rect.y().into(),
             rect.w.into(),
             rect.h.into(),
         );
@@ -153,12 +185,12 @@ impl Renderer {
         self.context
             .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &image,
-                frame.x.into(),
-                frame.y.into(),
+                frame.x().into(),
+                frame.y().into(),
                 frame.w.into(),
                 frame.h.into(),
-                destination.x.into(),
-                destination.y.into(),
+                destination.x().into(),
+                destination.y().into(),
                 destination.w.into(),
                 destination.h.into()
             )
@@ -248,7 +280,7 @@ fn process_input(
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Point {
     pub x: i16,
     pub y: i16,
@@ -256,31 +288,62 @@ pub struct Point {
 
 pub struct Image {
     element: HtmlImageElement,
-    position: Point,
     bounding_box: Rect,
 }
 
 impl Image {
     pub fn new(element: HtmlImageElement, position: Point) -> Self {
-        let bounding_box = Rect {
-            x: position.x.into(),
-            y: position.y.into(),
-            w: element.width() as f32,
-            h: element.height() as f32,
-        };
+        let bounding_box = Rect::new(
+            position,
+            element.width() as i16,
+            element.height() as i16
+        );
 
         Self {
             element,
-            position,
             bounding_box,
         }
     }
 
     pub fn draw(&self, renderer: &Renderer) {
-        renderer.draw_entire_image(&self.element, &self.position)
+        renderer.draw_entire_image(&self.element, &self.bounding_box.position)
     }
 
     pub fn bounding_box(&self) -> &Rect {
         &self.bounding_box
+    }
+
+    pub fn move_horizontally(&mut self, distance: i16) {
+      self.set_x(self.bounding_box.x() + distance);
+    }
+
+    pub fn set_x(&mut self, x: i16) {
+        self.bounding_box.set_x(x);
+    }
+
+    pub fn right(&self) -> i16 {
+        self.bounding_box.right()
+    }
+}
+
+pub struct SpriteSheet {
+    sheet: Sheet,
+    image: HtmlImageElement,
+}
+
+impl SpriteSheet {
+    pub fn new(sheet: Sheet, image: HtmlImageElement) -> Self {
+        Self {
+            sheet,
+            image,
+        }
+    }
+
+    pub fn cell(&self, name: &str) -> Option<&Cell> {
+        self.sheet.frames.get(name)
+    }
+
+    pub fn draw(&self, renderer: &Renderer, source: &Rect, destination: &Rect) {
+        renderer.draw_image(&self.image, source, destination)
     }
 }
