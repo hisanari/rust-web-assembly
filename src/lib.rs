@@ -2,6 +2,8 @@
 mod browser;
 mod engine;
 mod game;
+mod segments;
+
 use wasm_bindgen::prelude::*;
 use crate::engine::GameLoop;
 use crate::game::WalkTheDog;
