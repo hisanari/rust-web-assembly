@@ -3,6 +3,7 @@ mod browser;
 mod engine;
 mod game;
 mod segments;
+mod sound;
 
 use wasm_bindgen::prelude::*;
 use crate::engine::GameLoop;

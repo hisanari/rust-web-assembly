@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use futures::channel::oneshot::channel;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
-use crate::{browser};
+use web_sys::{AudioBuffer, AudioContext, CanvasRenderingContext2d, HtmlImageElement};
+use crate::{browser, sound};
 use anyhow::{anyhow, Result};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use async_trait::async_trait;
@@ -346,4 +346,38 @@ impl SpriteSheet {
     pub fn draw(&self, renderer: &Renderer, source: &Rect, destination: &Rect) {
         renderer.draw_image(&self.image, source, destination)
     }
+}
+
+#[derive(Clone)]
+pub struct Audio {
+    context: AudioContext,
+}
+
+impl Audio {
+    pub fn new() -> Result<Self> {
+        Ok(Audio {
+            context: sound::create_audio_context()?,
+        })
+    }
+
+    pub async fn load_sound(&self, filename: &str) -> Result<Sound> {
+        let array_buffer = browser::fetch_array_buffer(filename).await?;
+        let audio_buffer = sound::decode_audio_data(&self.context, &array_buffer).await?;
+        Ok(Sound {
+            buffer: audio_buffer,
+        })
+    }
+
+    pub fn play_sound(&self, sound: &Sound) -> Result<()> {
+        sound::play_sound(&self.context, &sound.buffer, sound::LOOPING::NO)
+    }
+
+    pub fn play_looping_sound(&self, sound: &Sound) -> Result<()> {
+        sound::play_sound(&self.context, &sound.buffer, sound::LOOPING::YES)
+    }
+}
+
+#[derive(Clone)]
+pub struct Sound {
+    buffer: AudioBuffer,
 }
